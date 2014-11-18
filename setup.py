@@ -29,9 +29,9 @@ setup(
     py_modules = [
         'bottle_mysql_connector'
     ],
-    requires = [
-        'bottle (>=0.9.x)'
-        'mysql-connector-python'
+    install_requires = [
+        'bottle>=0.9',
+        'mysql-connector-python>=2.0.1',
     ],
     classifiers = [
         'Environment :: Web Environment',

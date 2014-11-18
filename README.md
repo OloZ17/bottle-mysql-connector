@@ -16,7 +16,11 @@ Once installed, all you have to do is to add an ``db`` keyword argument
 Installation
 ------------
 
-Download the latest version from github:  https://github.com/OloZ17/bottle-mysql-connector
+Install using pip:
+
+    $ pip install bottle-mysql
+
+or download the latest version from github: https://github.com/OloZ17/bottle-mysql-connector
 
     $ git clone git://github.com/OloZ17/bottle-mysql-connector.git
     $ cd bottle-mysql-connector
