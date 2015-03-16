@@ -14,7 +14,7 @@ except ImportError:
 # modules that might not be installed yet.
 filename = os.path.join(os.path.dirname(__file__), 'bottle_mysql_connector.py')
 source = open(filename).read().split('### CUT HERE')[0]
-exec(source)
+exec source
 
 setup(
     name = 'bottle-mysql-connector',
@@ -43,3 +43,4 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     cmdclass = {'build_py': build_py}
+)

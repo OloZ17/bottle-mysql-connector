@@ -18,7 +18,7 @@ Installation
 
 Install using pip:
 
-    $ pip install bottle-mysql
+    $ pip install bottle-mysql-connector
 
 or download the latest version from github: https://github.com/OloZ17/bottle-mysql-connector
 
