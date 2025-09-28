@@ -284,7 +284,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Issues**: [GitHub Issues](https://github.com/OloZ17/bottle-mysql-connector/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/OloZ17/bottle-mysql-connector/discussions)
-- **Email**: lamarche@kwaga.com
+- **Email**: thomas.lamarche17@gmail.com
 
 ## Acknowledgments
 
