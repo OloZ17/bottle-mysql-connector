@@ -13,31 +13,35 @@ Results are returned as dictionaries if you put option at true
 
 Usage Example::
 
-import bottle
-import bottle_mysql_connector
+    import bottle
+    import bottle_mysql_connector
 
-application = bottle.default_app()
-# host is optional, default is localhost
-plugin = bottle_mysql_connector.Plugin(user=DB_USER, password=DB_PASSWORD, database=DB_NAME, host=DB_HOST, port=DB_PORT)
-application.install(plugin)
+    app = bottle.Bottle()
+    # host is optional, default is localhost
+    plugin = bottle_mysql_connector.Plugin(
+        user='DB_USER', 
+        password='DB_PASSWORD', 
+        database='DB_NAME', 
+        host='DB_HOST', 
+        port=3306
+    )
+    app.install(plugin)
 
-@app.route('/show/:<tem>')
-def show(item, db):
-    query = "SELECT {0} from items where name= %s".format(table)
-    data = (item,)
-    db.execute(query, data)
-    row = db.fetchone()
-    if row:
-        return template('showitem', page=row)
-    return HTTPError(404, "Page not found")
+    @app.route('/show/<item>')
+    def show(item, db):
+        query = "SELECT * from items where name = %s"
+        data = (item,)
+        db.execute(query, data)
+        row = db.fetchone()
+        if row:
+            return bottle.template('showitem', page=row)
+        return bottle.HTTPError(404, "Page not found")
 
 """
 
 __author__ = "Thomas Lamarche"
-__version__ = '0.0.4'
+__version__ = '0.1.0'
 __license__ = 'MIT'
-
-# ## CUT HERE (see setup.py)
 
 import inspect
 import mysql.connector
@@ -48,7 +52,6 @@ import bottle
 if not hasattr(bottle, 'PluginError'):
     class PluginError(bottle.BottleException):
         pass
-
     bottle.PluginError = PluginError
 
 
@@ -64,7 +67,26 @@ class MySQLConnectorPlugin(object):
     api = 2
 
     def __init__(self, user=None, password=None, database=None, host='localhost', port=3306, autocommit=True,
-                 dictionary=True, keyword='db', charset='utf8', time_zone=None, buffered=False):
+                 dictionary=True, keyword='db', charset='utf8mb4', time_zone=None, buffered=False,
+                 raise_on_warnings=False, use_pure=True):
+        """
+        Initialize the MySQL plugin.
+
+        Args:
+            user: MySQL username
+            password: MySQL password
+            database: Database name
+            host: MySQL server host (default: localhost)
+            port: MySQL server port (default: 3306)
+            autocommit: Enable autocommit (default: True)
+            dictionary: Return results as dictionaries (default: True)
+            keyword: Keyword argument name for database cursor (default: 'db')
+            charset: Character set to use (default: 'utf8mb4')
+            time_zone: Time zone to set for the connection
+            buffered: Use buffered cursor (default: False)
+            raise_on_warnings: Raise exceptions on warnings (default: False)
+            use_pure: Use pure Python implementation (default: True)
+        """
         self.host = host
         self.port = port
         self.user = user
@@ -76,6 +98,8 @@ class MySQLConnectorPlugin(object):
         self.charset = charset
         self.time_zone = time_zone
         self.buffered = buffered
+        self.raise_on_warnings = raise_on_warnings
+        self.use_pure = use_pure
 
     def setup(self, app):
         """
@@ -91,17 +115,13 @@ class MySQLConnectorPlugin(object):
                 self.name += '_%s' % self.keyword
 
     def apply(self, callback, route):
-        # hack to support bottle v0.9.x
-        if bottle.__version__.startswith('0.9'):
-            config = route['config']
-            _callback = route['callback']
-        else:
-            config = route.config
-            _callback = route.callback
+        # Get route configuration
+        config = route.config
+        _callback = route.callback
 
         # Override global configuration with route-specific values.
         if "mysql" in config:
-            # support for configuration before `ConfigDict` namespaces
+            # Support for configuration before `ConfigDict` namespaces
             g = lambda key, default: config.get('mysql', {}).get(key, default)
         else:
             g = lambda key, default: config.get('mysql.' + key, default)
@@ -117,58 +137,110 @@ class MySQLConnectorPlugin(object):
         charset = g('charset', self.charset)
         time_zone = g('time_zone', self.time_zone)
         buffered = g('buffered', self.buffered)
+        raise_on_warnings = g('raise_on_warnings', self.raise_on_warnings)
+        use_pure = g('use_pure', self.use_pure)
 
-        # Test if the original callback accepts a 'db' keyword.
+        # Test if the original callback accepts the keyword argument.
         # Ignore it if it does not need a database handle.
-        argspec = inspect.getargspec(_callback)
-        if keyword not in argspec.args:
+        sig = inspect.signature(_callback)
+        if keyword not in sig.parameters:
             return callback
 
-        CONFIG = {'user': user, 'password': password, 'host': host, 'port': port, 'database': database,
-                  'charset': charset}
-
         def wrapper(*args, **kwargs):
-            # Connect to the database
+            # Configuration for MySQL connection
+            config_dict = {
+                'user': user,
+                'password': password,
+                'host': host,
+                'port': port,
+                'database': database,
+                'charset': charset,
+                'autocommit': autocommit,
+                'raise_on_warnings': raise_on_warnings,
+                'use_pure': use_pure
+            }
+            
+            # Remove None values
+            config_dict = {k: v for k, v in config_dict.items() if v is not None}
+            
+            cnx = None
+            cursor = None
+            
             try:
-                cnx = mysql.connector.connect(**CONFIG)
-                # Using dictionary as cursor lets us return result as a dictionary instead of the default list
-                # Using buffered to fetch the entire result set from the server and buffers the rows
-                if dictionary and buffered:
-                    cursor = cnx.cursor(dictionary=True, buffered=True)
-                elif dictionary:
-                    cursor = cnx.cursor(dictionary=True)
-                else:
-                    cursor = cnx.cursor()
+                # Connect to the database
+                cnx = mysql.connector.connect(**config_dict)
+                
+                # Create cursor with appropriate options
+                cursor_kwargs = {}
+                if dictionary:
+                    cursor_kwargs['dictionary'] = True
+                if buffered:
+                    cursor_kwargs['buffered'] = True
+                    
+                cursor = cnx.cursor(**cursor_kwargs)
+                
+                # Set time zone if specified
                 if time_zone:
-                    cursor.execute("set time_zone=%s", (time_zone, ))
-            except bottle.HTTPResponse, e:
-                raise bottle.HTTPError(500, "Database Error", e)
+                    cursor.execute("SET time_zone = %s", (time_zone,))
+                    
+            except mysql.connector.Error as e:
+                if cnx:
+                    cnx.close()
+                raise bottle.HTTPError(500, f"Database Connection Error: {e}")
+            except Exception as e:
+                if cnx:
+                    cnx.close()
+                raise bottle.HTTPError(500, f"Unexpected Error: {e}")
 
-            # Add the connection handle as a keyword argument.
+            # Add the cursor as a keyword argument
             kwargs[keyword] = cursor
 
             try:
+                # Execute the route callback
                 rv = callback(*args, **kwargs)
-                if autocommit:
+                
+                # Commit if autocommit is enabled and connection is still open
+                if autocommit and cnx and cnx.is_connected():
                     cnx.commit()
+                    
+                return rv
+                
             except mysql.connector.IntegrityError as e:
-                cnx.rollback()
-                raise bottle.HTTPError(500, "Database Error", e)
+                if cnx and cnx.is_connected():
+                    cnx.rollback()
+                raise bottle.HTTPError(500, f"Database Integrity Error: {e}")
+            except mysql.connector.Error as e:
+                if cnx and cnx.is_connected():
+                    cnx.rollback()
+                raise bottle.HTTPError(500, f"Database Error: {e}")
             except bottle.HTTPError:
+                if autocommit and cnx and cnx.is_connected():
+                    cnx.rollback()
                 raise
             except bottle.HTTPResponse:
-                if autocommit:
+                if autocommit and cnx and cnx.is_connected():
                     cnx.commit()
                 raise
+            except Exception as e:
+                if cnx and cnx.is_connected():
+                    cnx.rollback()
+                raise
             finally:
+                # Clean up resources
                 if cursor:
-                    cursor.close()
+                    try:
+                        cursor.close()
+                    except:
+                        pass
                 if cnx:
-                    cnx.close()
-            return rv
+                    try:
+                        cnx.close()
+                    except:
+                        pass
 
-        # Replace the route callback with the wrapped one.
+        # Replace the route callback with the wrapped one
         return wrapper
 
 
+# Alias for backward compatibility
 Plugin = MySQLConnectorPlugin
