@@ -1,80 +1,305 @@
-Bottle-MySQL-Connector
-======================
+# Bottle MySQL Connector
 
-MySQL is the world's most used relational database management system (RDBMS) that runs
-as a server providing multi-user access to a number of databases.
+[![PyPI version](https://badge.fury.io/py/bottle-mysql-connector.svg)](https://badge.fury.io/py/bottle-mysql-connector)
+[![Python Versions](https://img.shields.io/pypi/pyversions/bottle-mysql-connector.svg)](https://pypi.org/project/bottle-mysql-connector/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This plugin simplifies the use of mysql databases in your Bottle applications using MySQL Connector/Python, a self-contained Python driver for communicating with MySQL servers.
+A lightweight MySQL plugin for the Bottle web framework, using the official mysql-connector-python driver.
 
-Once installed, all you have to do is to add an ``db`` keyword argument 
-(configurable) to route callbacks that need a database connection.
+## Features
 
+- 🚀 **Simple Integration** - Easy to setup and use with Bottle applications
+- 🔌 **Automatic Connection Management** - Handles connection lifecycle automatically
+- 📘 **Dictionary Cursor Support** - Returns query results as dictionaries for easy data access
+- ⚡ **Performance Optimized** - Supports buffered cursors and connection pooling
+- 🛡️ **Robust Error Handling** - Automatic rollback on errors with detailed error messages
+- 🎯 **Flexible Configuration** - Route-specific database configuration override
+- 🐍 **Modern Python Support** - Fully compatible with Python 3.6+
 
-`Bottle-MySQL-Connector` is written by [Thomas Lamarche](https://github.com/OloZ17)
+## Installation
 
+Install via pip:
 
-Installation
-------------
+```bash
+pip install bottle-mysql-connector
+```
 
-Install using pip:
+Or install from source:
 
-    $ pip install bottle-mysql-connector
+```bash
+git clone https://github.com/OloZ17/bottle-mysql-connector.git
+cd bottle-mysql-connector
+pip install .
+```
 
-or download the latest version from github: https://github.com/OloZ17/bottle-mysql-connector
+## Quick Start
 
-    $ git clone git://github.com/OloZ17/bottle-mysql-connector.git
-    $ cd bottle-mysql-connector
-    $ python setup.py install
+### Basic Usage
 
-Usage
------
+```python
+import bottle
+from bottle_mysql_connector import Plugin
 
-    import bottle
-	import bottle_mysql_connector
+# Create a Bottle app
+app = bottle.Bottle()
 
-	application = bottle.default_app()
-	# host is optional, default is localhost
-	plugin = bottle_mysql_connector.Plugin(user=DB_USER, password=DB_PASSWORD, database=DB_NAME, host=DB_HOST, port=DB_PORT)
-	application.install(plugin)
+# Configure the MySQL plugin
+plugin = Plugin(
+    user='your_user',
+    password='your_password',
+    database='your_database',
+    host='localhost',
+    port=3306,
+    charset='utf8mb4',
+    dictionary=True,  # Return rows as dictionaries
+    autocommit=True   # Autocommit transactions
+)
 
-	@app.route('/show/:<tem>')
-	def show(item, db):
-    	query = "SELECT {0} from items where name= %s".format(table)
-    	data = (item,)
-    	db.execute(query, data)
-    	row = db.fetchone()
-    	if row:
-        	return template('showitem', page=row)
-    	return HTTPError(404, "Page not found")
+# Install the plugin
+app.install(plugin)
 
-Routes that do not expect an ``db`` keyword argument are not affected.
+# Define routes that use the database
+@app.route('/users')
+def get_users(db):
+    """The 'db' parameter is automatically injected by the plugin."""
+    db.execute("SELECT id, name, email FROM users")
+    users = db.fetchall()
+    return {'users': users}
 
-The connection handle is configurable so that rows can be returned as either an
-index (like tuples) or as dictionaries. At the end of the request cycle, outstanding
-transactions are committed and the connection is closed automatically.
-If an error occurs, any changes to the database since the last commit are rolled back to keep
-the database in a consistent state.
+@app.route('/user/<user_id:int>')
+def get_user(user_id, db):
+    db.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+    user = db.fetchone()
+    if user:
+        return user
+    return bottle.HTTPError(404, "User not found")
 
-Configuration
--------------
+@app.route('/create_user', method='POST')
+def create_user(db):
+    data = bottle.request.json
+    db.execute(
+        "INSERT INTO users (name, email) VALUES (%s, %s)",
+        (data['name'], data['email'])
+    )
+    return {'id': db.lastrowid, 'status': 'created'}
 
-The following configuration options exist for the plugin class:
+# Run the application
+if __name__ == '__main__':
+    app.run(host='localhost', port=8080, debug=True)
+```
 
-* **user**: Username that will be used to connect to the database (default: None).
-* **password**: Password that will be used to connect to the database (default: None).
-* **database**: Database name that will be connected to (default: None).
-* **host**: Database server host (default: 'localhost').
-* **port**: Databse server port (default: 3306).
-* **keyword**: The keyword argument name that triggers the plugin (default: 'db').
-* **autocommit**: Whether or not to commit outstanding transactions at the end of the request cycle (default: True).
-* **dictionnary**: Whether or not to support dict-like access to row objects (default: True).
-* **charset**: Database connection charset (default: 'utf8')
-* **timezone**: Database connection time zone (default: None).
-* **buffered**: To fetch the entire result set from the server and buffers the rows (default: False).
+## Configuration Options
 
-You can override each of these values on a per-route basis: 
+| Parameter           | Type | Default     | Description                                   |
+| ------------------- | ---- | ----------- | --------------------------------------------- |
+| `user`              | str  | None        | MySQL username (required)                     |
+| `password`          | str  | None        | MySQL password (required)                     |
+| `database`          | str  | None        | Database name (required)                      |
+| `host`              | str  | 'localhost' | MySQL server hostname or IP                   |
+| `port`              | int  | 3306        | MySQL server port                             |
+| `charset`           | str  | 'utf8mb4'   | Character set for the connection              |
+| `autocommit`        | bool | True        | Enable automatic commit after each query      |
+| `dictionary`        | bool | True        | Return rows as dictionaries instead of tuples |
+| `buffered`          | bool | False       | Fetch and buffer all result rows immediately  |
+| `time_zone`         | str  | None        | Set the time zone for the connection          |
+| `keyword`           | str  | 'db'        | Parameter name for cursor injection in routes |
+| `raise_on_warnings` | bool | False       | Raise exceptions for MySQL warnings           |
+| `use_pure`          | bool | True        | Use pure Python implementation of connector   |
 
-    @app.route('/cache/<item>', mysql={'buffered': True})
-    def cache(item, db):
-        ...
+## Advanced Usage
 
+### Route-specific Configuration
+
+Override database settings for specific routes:
+
+```python
+@app.route('/special', mysql={'database': 'other_db', 'autocommit': False})
+def special_route(db):
+    """This route uses a different database and manual commit."""
+    db.execute("SELECT * FROM special_table")
+    data = db.fetchall()
+    db.connection.commit()  # Manual commit required
+    return {'data': data}
+```
+
+### Manual Transaction Management
+
+Disable autocommit for transaction control:
+
+```python
+@app.route('/transfer', method='POST', mysql={'autocommit': False})
+def transfer_funds(db):
+    try:
+        # Start transaction
+        db.execute("START TRANSACTION")
+
+        # Perform multiple operations
+        db.execute("UPDATE accounts SET balance = balance - %s WHERE id = %s", (100, 1))
+        db.execute("UPDATE accounts SET balance = balance + %s WHERE id = %s", (100, 2))
+
+        # Commit if all operations succeed
+        db.connection.commit()
+        return {'status': 'success', 'message': 'Transfer completed'}
+
+    except Exception as e:
+        # Rollback on error
+        db.connection.rollback()
+        return bottle.HTTPError(500, f"Transfer failed: {str(e)}")
+```
+
+### Working with Stored Procedures
+
+```python
+@app.route('/call_procedure/<proc_name>')
+def call_procedure(proc_name, db):
+    # Call a stored procedure
+    db.callproc(proc_name, args=['arg1', 'arg2'])
+
+    # Fetch results if the procedure returns data
+    results = []
+    for result in db.stored_results():
+        results.extend(result.fetchall())
+
+    return {'results': results}
+```
+
+### Pagination Example
+
+```python
+@app.route('/users/page/<page:int>')
+def get_users_paginated(page, db):
+    per_page = 10
+    offset = (page - 1) * per_page
+
+    # Get total count
+    db.execute("SELECT COUNT(*) as total FROM users")
+    total = db.fetchone()['total']
+
+    # Get paginated results
+    db.execute(
+        "SELECT * FROM users LIMIT %s OFFSET %s",
+        (per_page, offset)
+    )
+    users = db.fetchall()
+
+    return {
+        'users': users,
+        'page': page,
+        'per_page': per_page,
+        'total': total,
+        'total_pages': (total + per_page - 1) // per_page
+    }
+```
+
+### Using Connection Pooling
+
+For production environments with high traffic:
+
+```python
+from mysql.connector import pooling
+
+# Create a connection pool
+dbconfig = {
+    'user': 'your_user',
+    'password': 'your_password',
+    'database': 'your_database',
+    'host': 'localhost'
+}
+
+# Create pool with 5-32 connections
+cnxpool = pooling.MySQLConnectionPool(
+    pool_name="mypool",
+    pool_size=5,
+    pool_reset_session=True,
+    **dbconfig
+)
+
+# Use the pool in your application
+# The plugin will automatically use connections from the pool
+```
+
+## Error Handling
+
+The plugin provides comprehensive error handling:
+
+```python
+@app.route('/safe_operation')
+def safe_operation(db):
+    try:
+        db.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        return db.fetchone()
+    except mysql.connector.IntegrityError as e:
+        # Handle integrity constraint violations
+        return bottle.HTTPError(400, f"Data integrity error: {e}")
+    except mysql.connector.DataError as e:
+        # Handle data type errors
+        return bottle.HTTPError(400, f"Invalid data: {e}")
+    except mysql.connector.DatabaseError as e:
+        # Handle general database errors
+        return bottle.HTTPError(500, f"Database error: {e}")
+```
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Install test dependencies
+pip install pytest pytest-cov
+
+# Run tests
+pytest tests/
+
+# Run tests with coverage
+pytest tests/ --cov=bottle_mysql_connector --cov-report=html
+```
+
+## Requirements
+
+- Python 3.6 or higher
+- bottle >= 0.12
+- mysql-connector-python >= 8.0.0
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please make sure to:
+
+- Update tests as appropriate
+- Follow the existing code style
+- Update documentation for new features
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/OloZ17/bottle-mysql-connector/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/OloZ17/bottle-mysql-connector/discussions)
+- **Email**: lamarche@kwaga.com
+
+## Acknowledgments
+
+- The Bottle framework team for their excellent micro web framework
+- Oracle for the mysql-connector-python driver
+- All contributors who have helped improve this plugin
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed history of changes.
+
+## Authors
+
+- **Thomas Lamarche** - _Initial work_ - [OloZ17](https://github.com/OloZ17)
+
+---
+
+Made with ❤️ for the Bottle and MySQL communities

@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bottle-mysql-connector"
+dynamic = ["version"]
+description = "MySQL integration for Bottle using mysql-connector-python"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "Thomas Lamarche", email = "thomas.lamarche17@gmail.com"},
+]
+maintainers = [
+    {name = "Thomas Lamarche", email = "thomas.lamarche17@gmail.com"},
+]
+keywords = ["bottle", "plugin", "mysql", "database", "mysql-connector"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Bottle",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "bottle>=0.12",
+    "mysql-connector-python>=8.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/OloZ17/bottle-mysql-connector"
+Documentation = "https://github.com/OloZ17/bottle-mysql-connector#readme"
+Repository = "https://github.com/OloZ17/bottle-mysql-connector.git"
+"Bug Tracker" = "https://github.com/OloZ17/bottle-mysql-connector/issues"
+Changelog = "https://github.com/OloZ17/bottle-mysql-connector/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+py-modules = ["bottle_mysql_connector"]
+
+[tool.setuptools.dynamic]
+version = {attr = "bottle_mysql_connector.__version__"}

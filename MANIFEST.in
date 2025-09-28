@@ -1,0 +1,30 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include pyproject.toml
+include bottle_mysql_connector.py
+
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .*.swp
+recursive-exclude * *~
+recursive-exclude * .git
+recursive-exclude * .gitignore
+recursive-exclude * .DS_Store
+
+prune .git
+prune .github
+prune .vscode
+prune .idea
+prune build
+prune dist
+prune *.egg-info
+prune .pytest_cache
+prune .mypy_cache
+prune .tox
+prune htmlcov
+
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.orig
+global-exclude .DS_Store
